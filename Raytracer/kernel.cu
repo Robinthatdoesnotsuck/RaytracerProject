@@ -77,35 +77,35 @@ __device__ vector3 phongShading(light* luz, vector3* point, vector3* normal, vec
 	colorSalida.y += color->y * ambiental;
 	colorSalida.z += color->z * ambiental;
 	// difisuiasion
-	vector3 luz_vect;
-	luz_vect.x = luz->x - point->x;
-	luz_vect.y = luz->y - point->y;
-	luz_vect.z = luz->z - point->z;
+	for (int index = 0; index < 2; index++) {
+		vector3 luz_vect;
+		luz_vect.x = luz[index].x - point->x;
+		luz_vect.y = luz[index].y - point->y;
+		luz_vect.z = luz[index].z - point->z;
+		normalize(&luz_vect);
 
-	normalize(&luz_vect);
+		float dot_difuso = luz_vect.x * normal->x + luz_vect.y * normal->y + luz_vect.z * normal->z;
+		if (dot_difuso > 0) {
+			colorSalida.x += dot_difuso * color->x * difuso;
+			colorSalida.y += dot_difuso * color->y * difuso;
+			colorSalida.z += dot_difuso * color->z * difuso;
 
-	float dot_difuso = luz_vect.x * normal->x + luz_vect.y * normal->y + luz_vect.z * normal->z;
-	if (dot_difuso > 0) {
-		colorSalida.x += dot_difuso * color->x * difuso;
-		colorSalida.y += dot_difuso * color->y * difuso;
-		colorSalida.z += dot_difuso * color->z * difuso;
+			// Especular
+			vector3 rVect;
+			rVect.x = luz_vect.x - 2.0f * (dot_difuso)*normal->x;
+			rVect.y = luz_vect.y - 2.0f * (dot_difuso)*normal->y;
+			rVect.z = luz_vect.z - 2.0f * (dot_difuso)*normal->z;
+			// dot(v, r)
+			float dotVR = rVect.x * dir_camera->x + rVect.y * dir_camera->y + rVect.z * dir_camera->z;
 
-		// Especular
-		vector3 rVect;
-		rVect.x = luz_vect.x - 2.0f * (dot_difuso)*normal->x;
-		rVect.y = luz_vect.y - 2.0f * (dot_difuso)*normal->y;
-		rVect.z = luz_vect.z - 2.0f * (dot_difuso)*normal->z;
-		// dot(v, r)
-		float dotVR = rVect.x * dir_camera->x + rVect.y * dir_camera->y + rVect.z * dir_camera->z;
+			dotVR = powf(dotVR, brillantez);
 
-		dotVR = powf(dotVR, brillantez);
-
-		colorSalida.x += dotVR * color->x * especular;
-		colorSalida.y += dotVR * color->y * especular;
-		colorSalida.z += dotVR * color->z * especular;
+			colorSalida.x += dotVR * color->x * especular;
+			colorSalida.y += dotVR * color->y * especular;
+			colorSalida.z += dotVR * color->z * especular;
+		}
 	}
-
-
+	
 	colorSalida.x = min(255, (int)roundf(colorSalida.x));
 	colorSalida.y = min(255, (int)roundf(colorSalida.y));
 	colorSalida.z = min(255, (int)roundf(colorSalida.z));
@@ -379,7 +379,7 @@ int main()
 	cudaMemcpy(arrayd_dev, esferaArray, sizeof(esfera) * 3, cudaMemcpyHostToDevice);
 
 	//rayCasting << <blocks, threads >> > (width, height, esquina_dev, esferas_dev, luz_dev, camera_dev, img_dev, inc_x, -inc_y);
-	multipleRayCasting << <blocks, threads >> > (width, height, esquina_dev, arrayd_dev, luz_dev, camera_dev, img_dev, inc_x, -inc_y);
+	multipleRayCasting << <blocks, threads >> > (width, height, esquina_dev, arrayd_dev, light_array_dev, camera_dev, img_dev, inc_x, -inc_y);
 
 	cv::Mat frame = cv::Mat(cv::Size(width, height), CV_8UC3);
 	cudaMemcpy(frame.ptr(), img_dev, width * height * 3, cudaMemcpyDeviceToHost);
